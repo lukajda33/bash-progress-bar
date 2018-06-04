@@ -1,8 +1,16 @@
 #!/bin/bash
-trap interrupt INT
-function interrupt() {
+
+# variables: 
+# calculations: progressCols, progressPercentage, progressDone, progressMax, progressRemaining, progressReal
+# customizing: progressMessage1, progressMessage2, progressChar, progressLine, progressColor,
+# other: progressMessageLength, progressRst
+
+# functions: progressInit, progressDraw, progressInterrupt 
+
+trap progressInterrupt INT
+function progressInterrupt() {
 	tput cvvis
-	if [ $progressCols -gt 8 ]
+	if [[ $progressCols -gt 8 ]]
 	then
 		echo -e '  '"\r""$(tput setaf 1)**INTERRUPTED**$(tput sgr 0)"'  '$(tput el)
 		exit 1
@@ -13,10 +21,10 @@ function interrupt() {
 }
  
 function progressDraw () {
-	percentage=$(( $progressDone * 100 / $progressMax ))
-	if [ $progressCols -gt 8 ]
+	progressPercentage=$(( $progressDone * 100 / $progressMax ))
+	if [[ $progressCols -gt 8 ]]
 	then
-		progressReal=$(( $progressCols * $percentage / 100 ))
+		progressReal=$(( $progressCols * $progressPercentage / 100 ))
 		progressRemaining=$(( $progressCols - $progressReal ))
 		echo -n "$progressMessage1"
 		for i in $(seq $progressReal)
@@ -29,54 +37,78 @@ function progressDraw () {
 		done
 		echo -ne "$progressMessage2""\r"
 	else
-		echo -ne ${progressColor}"$percentage"' %'"\r"${progressRst}
+		echo -ne ${progressColor}"$progressPercentage"' %'"\r"${progressRst}
 	fi
 }
 
 function progressInit(){
+	#values
+	progressColorValue=2				# 0=black; 1=red; 2=green; 3=yellow; 4=blue; 5=magenta; 6=cyan; 7=white
+	progressDone=0
+	progressMax=1
+	progressChar='#'					# chars to copy: █ # 
+	progressLine='.'
+	progressMessage1=' Progress: | '
+	progressMessage2=' | '
+	
+	if [[ $progressDone -gt $progressMax ]]
+	then 
+		echo "Variable 'progressDone' must exceed value of 'progressMax'."
+		exit 7
+	fi
+
 	progressMessageLength=$(( ${#progressMessage1} + ${#progressMessage2} ))
-	if [ $progressMessageLength -ge $(( $(tput cols) -5 )) ]
+	if [[ $progressMessageLength -ge $(( $(tput cols) -5 )) ]]
 	then
-		echo Your message is too long.
+		echo "Your message is too long."
 		exit 3
 	fi
-	progressCols=$(( $(tput cols) - $progressMessageLength )) 
-	progressColor=$(tput setaf "$progressColorValue")
-	progressRst=$(tput sgr 0)								#resets color
-	if [ ${#progressChar} -ne 1 ]
+	progressCols=$(( $(tput cols) - $progressMessageLength ))
+ 
+	if [[ ${#progressChar} -ne 1 ]]
 	then
-		echo Variable progressChar must be one single character.
+		echo "Variable 'progressChar' must be one single character."
 		exit 2
 	fi
-	if [ ${#progressLine} -ne 1 ]
+	if [[ ${#progressLine} -ne 1 ]]
 	then
-		echo Variable progressLine must be one single character.
+		echo "Variable 'progressLine' must be one single character."
 		exit 2
 	fi
 	
+	case $progressDone in
+    ''|*[!0-9]*) echo "Variable 'progressDone' must be a number." ; exit 4 ;;
+    *) ;;
+	esac
+	
+	case $progressMax in
+    ''|*[!0-9]*) echo "Variable 'progressMax' must be a number." ; exit 4 ;;
+    *) ;;
+	esac
+
+	case $progressColorValue in
+	''|*[!0-9]*) echo "Variable 'progressColorValue' must be a number." ; exit 5 ;;
+	*) 
+		if [[ $progressColorValue -gt $(tput colors) ]]
+		then 
+			echo "Variable 'progressColorValue' is too high, max is: $(tput colors)."
+			exit 5
+		fi
+	;;
+	esac
+	
+	progressColor=$(tput setaf "$progressColorValue")
+	progressRst=$(tput sgr 0)								#resets color
 }
 
-#values
-progressColorValue=2						# 0=black; 1=red; 2=green; 3=yellow; 4=blue; 5=magenta; 6=cyan; 7=white
-progressDone=0
-progressMax=100
-progressChar='█'							# chars to copy: █ # 
-progressLine='.'
-progressMessage1=' Progress: '
-progressMessage2=' '
-
-#before launch
+#main function
 tput civis
 progressInit
-
-#loop
-while [ $progressDone -lt $progressMax ]
+while [[ $progressDone -lt $progressMax ]]
 do
 	progressDone=$(( $progressDone + 1 ))
 	progressDraw
 done
-
-#after finishing
 echo
 tput cvvis
 
